@@ -4185,13 +4185,24 @@ export async function prepareRequestBody(
 			// Novita) ignore `reasoning_effort` and require the vLLM chat-template
 			// flag to turn reasoning on. Only set it when the caller asked for
 			// reasoning so plain requests stay non-thinking.
+			//
+			// Mappings that think by default (e.g. InclusionAI Ling-3.0-flash) declare
+			// `chatTemplateThinkingKey` for the chat-template flag that controls
+			// thinking; `reasoning_effort: "none"` flips it to false to turn thinking
+			// off, and any other effort flips it to true.
 			if (supportsReasoning && (reasoning_effort || reasoning_max_tokens)) {
 				const thinkingMapping = modelDef?.providers.find(
 					(p) =>
 						p.providerId === usedProvider &&
 						((p as ProviderModelMapping).region ?? null) === usedRegion,
 				) as ProviderModelMapping | undefined;
-				if (thinkingMapping?.requiresEnableThinking) {
+				if (thinkingMapping?.chatTemplateThinkingKey) {
+					requestBody.chat_template_kwargs = {
+						...(requestBody.chat_template_kwargs ?? {}),
+						[thinkingMapping.chatTemplateThinkingKey]:
+							reasoning_effort !== "none",
+					};
+				} else if (thinkingMapping?.requiresEnableThinking) {
 					requestBody.chat_template_kwargs = {
 						...(requestBody.chat_template_kwargs ?? {}),
 						thinking: true,

@@ -6,6 +6,7 @@ import { bytedanceModels } from "./models/bytedance.js";
 import { deepseekModels } from "./models/deepseek.js";
 import { elevenlabsModels } from "./models/elevenlabs.js";
 import { googleModels } from "./models/google.js";
+import { inclusionaiModels } from "./models/inclusionai.js";
 import { llmgatewayModels } from "./models/llmgateway.js";
 import { metaModels } from "./models/meta.js";
 import { microsoftModels } from "./models/microsoft.js";
@@ -392,6 +393,15 @@ export interface ProviderModelMapping {
 	 */
 	requiresDisableThinkingParam?: boolean;
 	/**
+	 * Name of the chat-template kwargs key used to control thinking on
+	 * mappings that think by default and expose only a chat-template flag
+	 * (e.g. vLLM-hosted hybrid models). When set, `reasoning_effort: "none"`
+	 * sends `chat_template_kwargs: { [key]: false }` to turn thinking off, and
+	 * any other effort sends `{ [key]: true }`. Differs from
+	 * `requiresDisableThinkingParam`, which sends a binary `thinking` object.
+	 */
+	chatTemplateThinkingKey?: string;
+	/**
 	 * Whether this model supports the OpenAI responses API (defaults to true if reasoning is true)
 	 */
 	supportsResponsesApi?: boolean;
@@ -741,6 +751,7 @@ export const models = [
 	...openaiModels,
 	...anthropicModels,
 	...googleModels,
+	...inclusionaiModels,
 	...perplexityModels,
 	...xaiModels,
 	...xiaomiModels,

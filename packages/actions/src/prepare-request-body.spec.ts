@@ -1246,6 +1246,71 @@ describe("prepareRequestBody - Moonshot thinking", () => {
 	);
 });
 
+describe("prepareRequestBody - InclusionAI Ling-3.0-flash thinking", () => {
+	async function prepare(options: {
+		provider: Parameters<typeof prepareRequestBody>[0];
+		reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high" | "max";
+	}) {
+		return (await prepareRequestBody(
+			options.provider,
+			"ling-3.0-flash",
+			null,
+			options.provider === "deepinfra"
+				? "inclusionAI/Ling-3.0-flash"
+				: "inclusionai/ling-3.0-flash",
+			[{ role: "user", content: "Hello!" }],
+			false, // stream
+			undefined, // temperature
+			undefined, // max_tokens
+			undefined, // top_p
+			undefined, // frequency_penalty
+			undefined, // presence_penalty
+			undefined, // response_format
+			undefined, // tools
+			undefined, // tool_choice
+			options.reasoningEffort, // reasoning_effort
+			true, // supportsReasoning
+		)) as any;
+	}
+
+	test.each(["deepinfra", "novita"] as const)(
+		"maps none to enable_thinking disabled on %s and never forwards reasoning_effort",
+		async (provider) => {
+			const requestBody = await prepare({
+				provider,
+				reasoningEffort: "none",
+			});
+			expect(requestBody.chat_template_kwargs).toEqual({
+				enable_thinking: false,
+			});
+			expect(requestBody.reasoning_effort).toBeUndefined();
+		},
+	);
+
+	test.each(["deepinfra", "novita"] as const)(
+		"maps high to enable_thinking enabled on %s and never forwards reasoning_effort",
+		async (provider) => {
+			const requestBody = await prepare({
+				provider,
+				reasoningEffort: "high",
+			});
+			expect(requestBody.chat_template_kwargs).toEqual({
+				enable_thinking: true,
+			});
+			expect(requestBody.reasoning_effort).toBeUndefined();
+		},
+	);
+
+	test.each(["deepinfra", "novita"] as const)(
+		"keeps the provider default (thinking on) when no reasoning_effort is requested on %s",
+		async (provider) => {
+			const requestBody = await prepare({ provider });
+			expect(requestBody.chat_template_kwargs).toBeUndefined();
+			expect(requestBody.reasoning_effort).toBeUndefined();
+		},
+	);
+});
+
 describe("prepareRequestBody - embercloud reasoning shape", () => {
 	// embercloud's documented request body uses a nested `reasoning` object
 	// (reasoning.enabled + reasoning.effort) — the flat OpenAI-style
