@@ -12,6 +12,8 @@ export const inclusionaiModels = [
 			{
 				providerId: "deepinfra",
 				externalId: "inclusionAI/Ling-3.0-flash",
+				// DeepInfra is running a promotional sale on this model; these rates
+				// are the sale price and will revert once the promo ends.
 				inputPrice: "0.045e-6",
 				cachedInputPrice: "0.008e-6",
 				outputPrice: "0.1e-6",
