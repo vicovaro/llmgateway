@@ -26,6 +26,7 @@ import { ModelFaqSection } from "@/components/models/model-faq";
 import { ModelRating } from "@/components/models/model-rating";
 import { ModelStatusBadgeAuto } from "@/components/models/model-status-badge-auto";
 import { ModelUsageStats } from "@/components/models/model-usage-stats";
+import { PeakHoursCaption } from "@/components/models/price-display";
 import { ProviderTabs } from "@/components/models/provider-tabs";
 import { RelatedModels } from "@/components/models/related-models";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -45,8 +46,10 @@ import {
 	models as modelDefinitions,
 	providers as providerDefinitions,
 	expandAllProviderRegions,
+	resolvePricingDisplay,
 	type StabilityLevel,
 	type ModelDefinition,
+	type ProviderModelMapping,
 } from "@llmgateway/models";
 import { isMappingDeactivated } from "@llmgateway/shared/components";
 
@@ -57,6 +60,20 @@ interface PageProps {
 }
 
 export const revalidate = 60;
+
+// Per-token price for a token field, resolved for display: peak/off-peak
+// mappings report their off-peak rate as the representative (cheapest) price.
+function resolvedTokenPrice(
+	provider: ProviderModelMapping,
+	field: "inputPrice" | "outputPrice",
+): {
+	perMillion: number | null;
+	display: ReturnType<typeof resolvePricingDisplay>;
+} {
+	const display = resolvePricingDisplay(provider);
+	const raw = display.kind === "flat" ? display[field] : display.offPeak[field];
+	return { perMillion: perMillion(raw), display };
+}
 
 export default async function ModelPage({ params }: PageProps) {
 	const { name } = await params;
@@ -172,7 +189,10 @@ export default async function ModelPage({ params }: PageProps) {
 
 	const providerPrices = visibleProviders
 		.filter((p) => p.inputPrice)
-		.map((p) => applyDiscount(perMillion(p.inputPrice)!, p.discount));
+		.map((p) => {
+			const resolved = resolvedTokenPrice(p, "inputPrice");
+			return applyDiscount(resolved.perMillion!, p.discount);
+		});
 	const lowestInputPrice = Math.min(...providerPrices);
 	const highestInputPrice = Math.max(...providerPrices);
 
@@ -317,25 +337,51 @@ export default async function ModelPage({ params }: PageProps) {
 									{(() => {
 										const inputPrices = visibleProviders
 											.filter((p) => p.inputPrice)
-											.map((p) => ({
-												price: applyDiscount(
-													perMillion(p.inputPrice)!,
-													p.discount,
-												),
-												originalPrice: perMillion(p.inputPrice)!,
-												discount: p.discount,
-											}));
+											.map((p) => {
+												const resolved = resolvedTokenPrice(p, "inputPrice");
+												return {
+													price: applyDiscount(
+														resolved.perMillion!,
+														p.discount,
+													),
+													originalPrice: resolved.perMillion!,
+													discount: p.discount,
+													display: resolved.display,
+												};
+											});
 										const minPrice = Math.min(
 											...inputPrices.map((p) => p.price),
 										);
 										const minPriceItem = inputPrices.find(
 											(p) => p.price === minPrice,
 										);
-										return Number(minPriceItem?.discount ?? "0") > 0
-											? `$${minPrice.toFixed(2)}/M (${(Number(minPriceItem!.discount) * 100).toFixed(0)}% off)`
-											: `$${minPrice.toFixed(2)}/M`;
+										const base =
+											Number(minPriceItem?.discount ?? "0") > 0
+												? `$${minPrice.toFixed(2)}/M (${(Number(minPriceItem!.discount) * 100).toFixed(0)}% off)`
+												: `$${minPrice.toFixed(2)}/M`;
+										if (minPriceItem?.display.kind !== "peak-off-peak") {
+											return base;
+										}
+										const discountNum = Number(minPriceItem.discount ?? "0");
+										const peakPerM =
+											Number(minPriceItem.display.peak.inputPrice) *
+											1e6 *
+											(1 - discountNum);
+										return `${base} off-peak / $${peakPerM.toFixed(2)}/M peak`;
 									})()}{" "}
 									input tokens
+									{(() => {
+										const resolved = visibleProviders
+											.filter((p) => p.inputPrice)
+											.map((p) => resolvedTokenPrice(p, "inputPrice"));
+										const min = Math.min(...resolved.map((r) => r.perMillion!));
+										const winner = resolved.find((r) => r.perMillion === min);
+										return winner?.display.kind === "peak-off-peak" ? (
+											<span className="block text-muted-foreground/70 text-xs">
+												<PeakHoursCaption hoursUtc={winner.display.hoursUtc} />
+											</span>
+										) : null;
+									})()}
 									{visibleProviders.some(
 										(p) => (p.pricingTiers?.length ?? 0) > 1,
 									) && (
@@ -349,25 +395,51 @@ export default async function ModelPage({ params }: PageProps) {
 									{(() => {
 										const outputPrices = visibleProviders
 											.filter((p) => p.outputPrice)
-											.map((p) => ({
-												price: applyDiscount(
-													perMillion(p.outputPrice)!,
-													p.discount,
-												),
-												originalPrice: perMillion(p.outputPrice)!,
-												discount: p.discount,
-											}));
+											.map((p) => {
+												const resolved = resolvedTokenPrice(p, "outputPrice");
+												return {
+													price: applyDiscount(
+														resolved.perMillion!,
+														p.discount,
+													),
+													originalPrice: resolved.perMillion!,
+													discount: p.discount,
+													display: resolved.display,
+												};
+											});
 										const minPrice = Math.min(
 											...outputPrices.map((p) => p.price),
 										);
 										const minPriceItem = outputPrices.find(
 											(p) => p.price === minPrice,
 										);
-										return Number(minPriceItem?.discount ?? "0") > 0
-											? `$${minPrice.toFixed(2)}/M (${(Number(minPriceItem!.discount) * 100).toFixed(0)}% off)`
-											: `$${minPrice.toFixed(2)}/M`;
+										const base =
+											Number(minPriceItem?.discount ?? "0") > 0
+												? `$${minPrice.toFixed(2)}/M (${(Number(minPriceItem!.discount) * 100).toFixed(0)}% off)`
+												: `$${minPrice.toFixed(2)}/M`;
+										if (minPriceItem?.display.kind !== "peak-off-peak") {
+											return base;
+										}
+										const discountNum = Number(minPriceItem.discount ?? "0");
+										const peakPerM =
+											Number(minPriceItem.display.peak.outputPrice) *
+											1e6 *
+											(1 - discountNum);
+										return `${base} off-peak / $${peakPerM.toFixed(2)}/M peak`;
 									})()}{" "}
 									output tokens
+									{(() => {
+										const resolved = visibleProviders
+											.filter((p) => p.outputPrice)
+											.map((p) => resolvedTokenPrice(p, "outputPrice"));
+										const min = Math.min(...resolved.map((r) => r.perMillion!));
+										const winner = resolved.find((r) => r.perMillion === min);
+										return winner?.display.kind === "peak-off-peak" ? (
+											<span className="block text-muted-foreground/70 text-xs">
+												<PeakHoursCaption hoursUtc={winner.display.hoursUtc} />
+											</span>
+										) : null;
+									})()}
 									{visibleProviders.some(
 										(p) => (p.pricingTiers?.length ?? 0) > 1,
 									) && (

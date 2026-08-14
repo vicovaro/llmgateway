@@ -13,6 +13,7 @@ export * from "./models-directory/model-card";
 export * from "./models-directory/model-category-filters";
 export * from "./models-directory/model-code-example-dialog";
 export * from "./models-directory/model-status-badge";
+export * from "./models-directory/peak-aware-price";
 export * from "./multi-model-id-selector";
 export * from "./multi-model-selector";
 export * from "./multi-provider-selector";

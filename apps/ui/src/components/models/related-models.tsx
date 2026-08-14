@@ -1,12 +1,18 @@
 import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 
+import {
+	PeakHoursCaption,
+	PriceDisplay,
+} from "@/components/models/price-display";
 import { perMillion } from "@/lib/discount";
 
 import {
 	models as modelDefinitions,
 	providers as providerDefinitions,
+	resolvePricingDisplay,
 	type ModelDefinition,
+	type ProviderModelMapping,
 } from "@llmgateway/models";
 import { isMappingDeactivated } from "@llmgateway/shared/components";
 
@@ -19,11 +25,18 @@ function activeMappings(model: ModelDefinition) {
 function startingPrice(
 	model: ModelDefinition,
 	field: "inputPrice" | "outputPrice",
-): number | null {
-	const prices = activeMappings(model)
-		.map((p) => perMillion(p[field]))
-		.filter((n): n is number => n !== null && Number.isFinite(n));
-	return prices.length > 0 ? Math.min(...prices) : null;
+): { value: number | null; mapping: ProviderModelMapping | null } {
+	let best: { value: number; mapping: ProviderModelMapping } | null = null;
+	for (const p of activeMappings(model)) {
+		const display = resolvePricingDisplay(p);
+		const raw =
+			display.kind === "flat" ? display[field] : display.offPeak[field];
+		const n = perMillion(raw);
+		if (n !== null && Number.isFinite(n) && (best === null || n < best.value)) {
+			best = { value: n, mapping: p };
+		}
+	}
+	return { value: best?.value ?? null, mapping: best?.mapping ?? null };
 }
 
 // Internal-linking block: other active models from the same family, newest
@@ -72,6 +85,20 @@ export function RelatedModels({ modelDef }: { modelDef: ModelDefinition }) {
 					);
 					const minInput = startingPrice(model, "inputPrice");
 					const minOutput = startingPrice(model, "outputPrice");
+					const inputDisplay = minInput.mapping
+						? resolvePricingDisplay(minInput.mapping)
+						: undefined;
+					const outputDisplay = minOutput.mapping
+						? resolvePricingDisplay(minOutput.mapping)
+						: undefined;
+					const hoursCaption =
+						inputDisplay?.kind === "peak-off-peak"
+							? inputDisplay.hoursUtc
+							: outputDisplay?.kind === "peak-off-peak"
+								? outputDisplay.hoursUtc
+								: undefined;
+					const formatPrice = (price: string) =>
+						`$${perMillion(price)!.toFixed(2)}`;
 					return (
 						<Link
 							key={model.id}
@@ -88,15 +115,32 @@ export function RelatedModels({ modelDef }: { modelDef: ModelDefinition }) {
 								{model.free ? (
 									<span>Free</span>
 								) : (
-									minInput !== null &&
-									minOutput !== null && (
+									minInput.value !== null &&
+									minInput.mapping !== null &&
+									minOutput.value !== null &&
+									minOutput.mapping !== null && (
 										<span>
-											${minInput.toFixed(2)} in / ${minOutput.toFixed(2)} out
-											per 1M
+											<PriceDisplay
+												mapping={minInput.mapping}
+												field="inputPrice"
+												format={formatPrice}
+											/>{" "}
+											in /{" "}
+											<PriceDisplay
+												mapping={minOutput.mapping}
+												field="outputPrice"
+												format={formatPrice}
+											/>{" "}
+											out per 1M
 										</span>
 									)
 								)}
 							</p>
+							{hoursCaption && (
+								<p className="mt-0.5 text-[10px] text-muted-foreground/70">
+									<PeakHoursCaption hoursUtc={hoursCaption} />
+								</p>
+							)}
 						</Link>
 					);
 				})}

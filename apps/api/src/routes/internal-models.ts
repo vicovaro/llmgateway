@@ -66,6 +66,22 @@ const modelProviderMappingSchema = z.object({
 	inputPrice: z.string().nullable(),
 	outputPrice: z.string().nullable(),
 	cachedInputPrice: z.string().nullable(),
+	peakPricing: z
+		.object({
+			effectiveAt: z.string(),
+			hoursUtc: z.array(z.tuple([z.number(), z.number()])),
+			peak: z.object({
+				inputPrice: z.string(),
+				outputPrice: z.string(),
+				cachedInputPrice: z.string().nullable(),
+			}),
+			offPeak: z.object({
+				inputPrice: z.string(),
+				outputPrice: z.string(),
+				cachedInputPrice: z.string().nullable(),
+			}),
+		})
+		.nullable(),
 	cacheWriteInputPrice: z.string().nullable(),
 	cacheWriteInputPrice1h: z.string().nullable(),
 	imageInputPrice: z.string().nullable(),
@@ -253,6 +269,26 @@ internalModels.openapi(getModelsRoute, async (c) => {
 			return {
 				...mapping,
 				discount: getGlobalDiscount(mapping.providerId, model.id),
+				peakPricing: sharedMapping?.peakPricing
+					? {
+							effectiveAt: sharedMapping.peakPricing.effectiveAt,
+							hoursUtc: sharedMapping.peakPricing.hoursUtc.map(
+								([start, end]) => [start, end] as [number, number],
+							),
+							peak: {
+								inputPrice: sharedMapping.peakPricing.peak.inputPrice,
+								outputPrice: sharedMapping.peakPricing.peak.outputPrice,
+								cachedInputPrice:
+									sharedMapping.peakPricing.peak.cachedInputPrice ?? null,
+							},
+							offPeak: {
+								inputPrice: sharedMapping.peakPricing.offPeak.inputPrice,
+								outputPrice: sharedMapping.peakPricing.offPeak.outputPrice,
+								cachedInputPrice:
+									sharedMapping.peakPricing.offPeak.cachedInputPrice ?? null,
+							},
+						}
+					: null,
 				quantization: sharedMapping?.quantization ?? null,
 				reasoningEfforts: sharedMapping?.reasoningEfforts ?? null,
 				audio: sharedMapping?.audio ?? null,

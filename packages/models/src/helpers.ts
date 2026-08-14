@@ -241,3 +241,65 @@ export function resolveTimeBasedPricing(
 		cachedInputPrice: tier.cachedInputPrice,
 	};
 }
+
+export type PricingDisplay =
+	| {
+			kind: "flat";
+			inputPrice: string | undefined;
+			outputPrice: string | undefined;
+			cachedInputPrice: string | undefined;
+	  }
+	| {
+			kind: "peak-off-peak";
+			offPeak: {
+				inputPrice: string;
+				outputPrice: string;
+				cachedInputPrice: string | undefined;
+			};
+			peak: {
+				inputPrice: string;
+				outputPrice: string;
+				cachedInputPrice: string | undefined;
+			};
+			hoursUtc: readonly [start: number, end: number][];
+			effectiveAt: string;
+	  };
+
+/**
+ * Resolve the pricing a mapping should display at a given instant. Mappings
+ * without `peakPricing` (and mappings before `effectiveAt`) display the base
+ * flat rates; on/after `effectiveAt` the peak/off-peak rates apply. Evaluate
+ * at call time — never bake the choice at build time.
+ */
+export function resolvePricingDisplay(
+	mapping: Pick<
+		ProviderModelMapping,
+		"inputPrice" | "outputPrice" | "cachedInputPrice" | "peakPricing"
+	>,
+	now: Date = new Date(),
+): PricingDisplay {
+	const peakPricing = mapping.peakPricing;
+	const base = {
+		inputPrice: mapping.inputPrice,
+		outputPrice: mapping.outputPrice,
+		cachedInputPrice: mapping.cachedInputPrice,
+	};
+	if (!peakPricing || now.getTime() < Date.parse(peakPricing.effectiveAt)) {
+		return { kind: "flat", ...base };
+	}
+	return {
+		kind: "peak-off-peak",
+		offPeak: {
+			inputPrice: peakPricing.offPeak.inputPrice,
+			outputPrice: peakPricing.offPeak.outputPrice,
+			cachedInputPrice: peakPricing.offPeak.cachedInputPrice,
+		},
+		peak: {
+			inputPrice: peakPricing.peak.inputPrice,
+			outputPrice: peakPricing.peak.outputPrice,
+			cachedInputPrice: peakPricing.peak.cachedInputPrice,
+		},
+		hoursUtc: peakPricing.hoursUtc,
+		effectiveAt: peakPricing.effectiveAt,
+	};
+}

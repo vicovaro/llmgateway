@@ -80,6 +80,7 @@ import { cn } from "@/lib/utils";
 import { formatDeprecationDate, formatPerImagePriceRange } from "./format";
 import { ModelCard } from "./model-card";
 import { applyCategoryFilter } from "./model-category-filters";
+import { PeakAwarePriceValue } from "./peak-aware-price";
 import { useIsMobile } from "./use-mobile";
 
 import type {
@@ -562,7 +563,11 @@ const ModelTableRow = React.memo(
 								</TooltipContent>
 							</Tooltip>
 						) : (
-							formatPrice(row.provider.inputPrice, row.provider.discount)
+							<PeakAwarePriceValue
+								mapping={row.provider}
+								field="inputPrice"
+								formatPrice={(p) => formatPrice(p, row.provider.discount)}
+							/>
 						)}
 					</TableCell>
 
@@ -599,13 +604,21 @@ const ModelTableRow = React.memo(
 									parseFloat(row.provider.inputCharacterPrice) > 0)) ? (
 							<span className="text-muted-foreground">—</span>
 						) : (
-							formatPrice(row.provider.outputPrice, row.provider.discount)
+							<PeakAwarePriceValue
+								mapping={row.provider}
+								field="outputPrice"
+								formatPrice={(p) => formatPrice(p, row.provider.discount)}
+							/>
 						)}
 					</TableCell>
 
 					{/* Cache Read Price Column */}
 					<TableCell className="text-right font-mono text-sm">
-						{formatPrice(row.provider.cachedInputPrice, row.provider.discount)}
+						<PeakAwarePriceValue
+							mapping={row.provider}
+							field="cachedInputPrice"
+							formatPrice={(p) => formatPrice(p, row.provider.discount)}
+						/>
 					</TableCell>
 
 					{/* Features Column */}

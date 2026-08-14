@@ -20,6 +20,10 @@ import {
 import { useState } from "react";
 
 import { ModelCodeExampleDialog } from "@/components/models/model-code-example-dialog";
+import {
+	PeakHoursCaption,
+	PriceDisplay,
+} from "@/components/models/price-display";
 import { Badge } from "@/lib/components/badge";
 import { Button } from "@/lib/components/button";
 import { Card, CardContent } from "@/lib/components/card";
@@ -40,6 +44,7 @@ import { XIcon } from "@/lib/icons/XIcon";
 import { getLoungeStudioPath } from "@/lib/model-utils";
 import { formatContextSize, formatDeprecationDate } from "@/lib/utils";
 
+import { resolvePricingDisplay } from "@llmgateway/models";
 import { getProviderIcon } from "@llmgateway/shared/components";
 
 import type {
@@ -72,6 +77,7 @@ export function ModelProviderCard({
 	const providerModelName = `${provider.providerId}/${modelName}`;
 	const ProviderIcon = getProviderIcon(provider.providerId);
 	const providerStability = provider.stability ?? modelStability;
+	const pricingDisplay = resolvePricingDisplay(provider);
 
 	const shareUrl = `${config.appUrl}/models/${encodeURIComponent(modelName)}/${encodeURIComponent(provider.providerId)}`;
 	const shareTitle = `${provider.providerInfo?.name ?? provider.providerId} - ${modelName} on LLM Gateway`;
@@ -122,6 +128,20 @@ export function ModelProviderCard({
 		const n = typeof price === "string" ? Number(price) : price;
 		return `$${(n * 1e6).toFixed(2)}`;
 	};
+
+	const renderPrice = (price: string) =>
+		Number(provider.discount ?? "0") > 0 ? (
+			<>
+				<span className="line-through text-muted-foreground text-xs">
+					{formatPrice(price)}
+				</span>
+				<span className="text-green-600 font-semibold">
+					{formatPrice(Number(price) * (1 - Number(provider.discount)))}
+				</span>
+			</>
+		) : (
+			formatPrice(price)
+		);
 
 	return (
 		<Card>
@@ -289,21 +309,11 @@ export function ModelProviderCard({
 								{provider.inputPrice ? (
 									<div className="space-y-1">
 										<div className="flex items-center gap-2">
-											{Number(provider.discount ?? "0") > 0 ? (
-												<>
-													<span className="line-through text-muted-foreground text-xs">
-														{formatPrice(provider.inputPrice)}
-													</span>
-													<span className="text-green-600 font-semibold">
-														{formatPrice(
-															Number(provider.inputPrice) *
-																(1 - Number(provider.discount)),
-														)}
-													</span>
-												</>
-											) : (
-												formatPrice(provider.inputPrice)
-											)}
+											<PriceDisplay
+												mapping={provider}
+												field="inputPrice"
+												format={renderPrice}
+											/>
 										</div>
 										<span className="text-muted-foreground text-xs">/M</span>
 									</div>
@@ -318,21 +328,11 @@ export function ModelProviderCard({
 								{provider.cachedInputPrice ? (
 									<div className="space-y-1">
 										<div className="flex items-center gap-2">
-											{Number(provider.discount ?? "0") > 0 ? (
-												<>
-													<span className="line-through text-muted-foreground text-xs">
-														{formatPrice(provider.cachedInputPrice)}
-													</span>
-													<span className="text-green-600 font-semibold">
-														{formatPrice(
-															Number(provider.cachedInputPrice) *
-																(1 - Number(provider.discount)),
-														)}
-													</span>
-												</>
-											) : (
-												formatPrice(provider.cachedInputPrice)
-											)}
+											<PriceDisplay
+												mapping={provider}
+												field="cachedInputPrice"
+												format={renderPrice}
+											/>
 										</div>
 										<span className="text-muted-foreground text-xs">/M</span>
 									</div>
@@ -347,21 +347,11 @@ export function ModelProviderCard({
 								{provider.outputPrice ? (
 									<div className="space-y-1">
 										<div className="flex items-center gap-2">
-											{Number(provider.discount ?? "0") > 0 ? (
-												<>
-													<span className="line-through text-muted-foreground text-xs">
-														{formatPrice(provider.outputPrice)}
-													</span>
-													<span className="text-green-600 font-semibold">
-														{formatPrice(
-															Number(provider.outputPrice) *
-																(1 - Number(provider.discount)),
-														)}
-													</span>
-												</>
-											) : (
-												formatPrice(provider.outputPrice)
-											)}
+											<PriceDisplay
+												mapping={provider}
+												field="outputPrice"
+												format={renderPrice}
+											/>
 										</div>
 										<span className="text-muted-foreground text-xs">/M</span>
 									</div>
@@ -371,6 +361,11 @@ export function ModelProviderCard({
 							</div>
 						</div>
 					</div>
+					{pricingDisplay.kind === "peak-off-peak" && (
+						<div className="mt-1 text-muted-foreground/70 text-[10px]">
+							<PeakHoursCaption hoursUtc={pricingDisplay.hoursUtc} />
+						</div>
+					)}
 					{(provider.imageInputTokensByResolution ??
 						provider.imageOutputTokensByResolution) && (
 						<div className="mt-3 pt-3 border-t">

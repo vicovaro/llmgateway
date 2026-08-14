@@ -68,6 +68,22 @@ const modelSchema = z.object({
 					input_cache_write_1h: z.string().optional(),
 					ocr_page: z.string().optional(),
 					input_audio_hour: z.string().optional(),
+					peak_pricing: z
+						.object({
+							effective_at: z.string(),
+							hours_utc: z.array(z.tuple([z.number(), z.number()])),
+							peak: z.object({
+								prompt: z.string(),
+								completion: z.string(),
+								input_cache_read: z.string().optional(),
+							}),
+							off_peak: z.object({
+								prompt: z.string(),
+								completion: z.string(),
+								input_cache_read: z.string().optional(),
+							}),
+						})
+						.optional(),
 				})
 				.optional(),
 			streaming: z.union([z.boolean(), z.literal("only")]),
@@ -119,6 +135,22 @@ const modelSchema = z.object({
 		internal_reasoning: z.string().optional(),
 		ocr_page: z.string().optional(),
 		input_audio_hour: z.string().optional(),
+		peak_pricing: z
+			.object({
+				effective_at: z.string(),
+				hours_utc: z.array(z.tuple([z.number(), z.number()])),
+				peak: z.object({
+					prompt: z.string(),
+					completion: z.string(),
+					input_cache_read: z.string().optional(),
+				}),
+				off_peak: z.object({
+					prompt: z.string(),
+					completion: z.string(),
+					input_cache_read: z.string().optional(),
+				}),
+			})
+			.optional(),
 	}),
 	context_length: z.number().optional(),
 	max_output: z.number().optional().openapi({
@@ -521,7 +553,8 @@ function hasPricing(p: ProviderModelMapping): boolean {
 		p.perSecondPrice !== undefined ||
 		p.perImagePrice !== undefined ||
 		p.ocrPagePrice !== undefined ||
-		p.inputAudioHourPrice !== undefined
+		p.inputAudioHourPrice !== undefined ||
+		p.peakPricing !== undefined
 	);
 }
 
@@ -559,6 +592,28 @@ function buildPricingFields(p: ProviderModelMapping | undefined) {
 		input_cache_write_1h: p?.cacheWriteInputPrice1h?.toString() ?? "0",
 		ocr_page: p?.ocrPagePrice?.toString(),
 		input_audio_hour: p?.inputAudioHourPrice?.toString(),
+		// Present only when the mapping bills peak/off-peak rates. `hours_utc`
+		// entries are half-open [start, end) UTC hour ranges; before
+		// `effective_at` the base `prompt`/`completion`/`input_cache_read`
+		// fields apply, on/after the peak/off-peak rates below apply.
+		peak_pricing: p?.peakPricing
+			? {
+					effective_at: p.peakPricing.effectiveAt,
+					hours_utc: p.peakPricing.hoursUtc.map(
+						([start, end]): [number, number] => [start, end],
+					),
+					peak: {
+						prompt: p.peakPricing.peak.inputPrice,
+						completion: p.peakPricing.peak.outputPrice,
+						input_cache_read: p.peakPricing.peak.cachedInputPrice,
+					},
+					off_peak: {
+						prompt: p.peakPricing.offPeak.inputPrice,
+						completion: p.peakPricing.offPeak.outputPrice,
+						input_cache_read: p.peakPricing.offPeak.cachedInputPrice,
+					},
+				}
+			: undefined,
 	};
 }
 

@@ -23,6 +23,7 @@ import {
 import { ModelCtaButton } from "@/components/models/model-cta-button";
 import { ModelRating } from "@/components/models/model-rating";
 import { ModelStatusBadgeAuto } from "@/components/models/model-status-badge-auto";
+import { formatPeakHoursUtc } from "@/components/models/price-display";
 import { ProviderTabs } from "@/components/models/provider-tabs";
 import { Badge } from "@/lib/components/badge";
 import { findEffectiveProviderDiscount } from "@/lib/discount";
@@ -33,6 +34,7 @@ import {
 	models as modelDefinitions,
 	providers as providerDefinitions,
 	expandAllProviderRegions,
+	resolvePricingDisplay,
 	type StabilityLevel,
 	type ModelDefinition,
 } from "@llmgateway/models";
@@ -100,6 +102,47 @@ export default async function ModelProviderPage({ params }: PageProps) {
 		...staticProviderMapping,
 		discount: bannerDiscount?.discountPercent,
 	};
+
+	// JSON-LD must never advertise a single flat price once peak/off-peak
+	// pricing is active: the off-peak rate is the main offer price and the
+	// peak rate is added as a second price specification.
+	const pricingDisplay = resolvePricingDisplay(providerMapping);
+	const mainInputPrice =
+		pricingDisplay.kind === "flat"
+			? pricingDisplay.inputPrice
+			: pricingDisplay.offPeak.inputPrice;
+	const peakInputPrice =
+		pricingDisplay.kind === "peak-off-peak"
+			? pricingDisplay.peak.inputPrice
+			: undefined;
+	const peakHours =
+		pricingDisplay.kind === "peak-off-peak"
+			? formatPeakHoursUtc(pricingDisplay.hoursUtc)
+			: undefined;
+	const unitPriceSpecification =
+		peakInputPrice !== undefined
+			? [
+					{
+						"@type": "UnitPriceSpecification",
+						price: mainInputPrice,
+						priceCurrency: "USD",
+						unitText: "per 1M input tokens",
+						description: "Off-peak rate",
+					},
+					{
+						"@type": "UnitPriceSpecification",
+						price: peakInputPrice,
+						priceCurrency: "USD",
+						unitText: "per 1M input tokens",
+						description: `Peak rate (${peakHours})`,
+					},
+				]
+			: {
+					"@type": "UnitPriceSpecification",
+					price: mainInputPrice,
+					priceCurrency: "USD",
+					unitText: "per 1M input tokens",
+				};
 
 	const getStabilityBadgeProps = (stability?: StabilityLevel) => {
 		switch (stability) {
@@ -182,15 +225,10 @@ export default async function ModelProviderPage({ params }: PageProps) {
 		offers: {
 			"@type": "AggregateOffer",
 			priceCurrency: "USD",
-			lowPrice: providerMapping.inputPrice ?? 0,
-			highPrice: providerMapping.inputPrice ?? 0,
+			lowPrice: mainInputPrice ?? 0,
+			highPrice: peakInputPrice ?? mainInputPrice ?? 0,
 			offerCount: 1,
-			priceSpecification: {
-				"@type": "UnitPriceSpecification",
-				price: providerMapping.inputPrice ?? 0,
-				priceCurrency: "USD",
-				unitText: "per 1M input tokens",
-			},
+			priceSpecification: unitPriceSpecification,
 			availability: "https://schema.org/InStock",
 			url: `https://llmgateway.io/models/${encodeURIComponent(decodedName)}/${encodeURIComponent(decodedProvider)}`,
 			seller: {

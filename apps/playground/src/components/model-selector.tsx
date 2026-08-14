@@ -53,6 +53,7 @@ import {
 	formatPerImagePriceRange,
 	getProviderIcon,
 	providerLogoUrls,
+	resolveApiMappingPricingDisplay,
 } from "@llmgateway/shared/components";
 
 import type {
@@ -214,6 +215,32 @@ function getMappingPriceInfo(
 	}
 
 	const discountNum = mapping.discount ? parseFloat(mapping.discount) : 0;
+
+	// Peak/off-peak time-of-day pricing (DeepSeek first-party): once
+	// effectiveAt passes, show both rates instead of the flat base price.
+	if (field === "input" || field === "output" || field === "cachedInput") {
+		const display = resolveApiMappingPricingDisplay(mapping);
+		if (display.kind === "peak-off-peak") {
+			const fieldKey =
+				field === "input"
+					? "inputPrice"
+					: field === "output"
+						? "outputPrice"
+						: "cachedInputPrice";
+			const offPeak = display.offPeak[fieldKey];
+			const peak = display.peak[fieldKey];
+			if (offPeak !== undefined && peak !== undefined) {
+				const format = (price: string, discount: number) =>
+					formatPrice(parseFloat(price) * (1 - discount));
+				const original = `${formatPrice(offPeak)} off-peak / ${formatPrice(peak)} peak`;
+				if (discountNum > 0) {
+					const discounted = `${format(offPeak, discountNum)} off-peak / ${format(peak, discountNum)} peak`;
+					return { label: discounted, original, discounted };
+				}
+				return { label: original, original };
+			}
+		}
+	}
 
 	// Request price is a flat per-request fee, not per-token
 	if (field === "request") {

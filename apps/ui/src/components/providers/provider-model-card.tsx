@@ -4,6 +4,10 @@ import { AlertTriangle, Copy, Check, Play } from "lucide-react";
 import { useState } from "react";
 
 import { ModelCodeExampleDialog } from "@/components/models/model-code-example-dialog";
+import {
+	PeakHoursCaption,
+	PriceDisplay,
+} from "@/components/models/price-display";
 import { Badge } from "@/lib/components/badge";
 import { Button } from "@/lib/components/button";
 import { Card } from "@/lib/components/card";
@@ -17,6 +21,7 @@ import { useAppConfig } from "@/lib/config";
 import { getLoungeStudioPath } from "@/lib/model-utils";
 import { formatContextSize } from "@/lib/utils";
 
+import type { MappingPriceFields } from "@/components/models/price-display";
 import type {
 	ApiModel,
 	ApiModelProviderMapping,
@@ -86,6 +91,32 @@ export function ProviderModelCard({
 
 	const provider = model.providerDetails[0].provider;
 	const providerModelId = `${provider.providerId}/${model.id}`;
+
+	// The card's provider is the serialized API shape (nullable prices); build
+	// the catalogue-shaped mapping `resolvePricingDisplay` expects.
+	const displayMapping = {
+		inputPrice: provider.inputPrice ?? undefined,
+		outputPrice: provider.outputPrice ?? undefined,
+		cachedInputPrice: provider.cachedInputPrice ?? undefined,
+		peakPricing: provider.peakPricing
+			? {
+					effectiveAt: provider.peakPricing.effectiveAt,
+					hoursUtc: provider.peakPricing.hoursUtc,
+					peak: {
+						inputPrice: provider.peakPricing.peak.inputPrice,
+						outputPrice: provider.peakPricing.peak.outputPrice,
+						cachedInputPrice:
+							provider.peakPricing.peak.cachedInputPrice ?? undefined,
+					},
+					offPeak: {
+						inputPrice: provider.peakPricing.offPeak.inputPrice,
+						outputPrice: provider.peakPricing.offPeak.outputPrice,
+						cachedInputPrice:
+							provider.peakPricing.offPeak.cachedInputPrice ?? undefined,
+					},
+				}
+			: undefined,
+	} satisfies MappingPriceFields;
 
 	return (
 		<TooltipProvider>
@@ -171,70 +202,34 @@ export function ProviderModelCard({
 							<div className="space-y-1">
 								<div className="text-xs text-muted-foreground">Input</div>
 								<div className="font-semibold text-foreground text-sm">
-									{typeof formatPrice(
-										provider.inputPrice,
-										provider.discount,
-									) === "string" ? (
-										<>
-											{formatPrice(provider.inputPrice, provider.discount)}
-											<span className="text-muted-foreground text-xs ml-1">
-												/M
-											</span>
-										</>
-									) : (
-										<span className="inline-flex items-baseline gap-1">
-											{formatPrice(provider.inputPrice, provider.discount)}
-											<span className="text-muted-foreground text-xs">/M</span>
-										</span>
-									)}
+									<PriceDisplay
+										mapping={displayMapping}
+										field="inputPrice"
+										format={(price) => formatPrice(price, provider.discount)}
+									/>
+									<span className="text-muted-foreground text-xs ml-1">/M</span>
 								</div>
 							</div>
 							<div className="space-y-1">
 								<div className="text-xs text-muted-foreground">Cached</div>
 								<div className="font-semibold text-foreground text-sm">
-									{typeof formatPrice(
-										provider.cachedInputPrice,
-										provider.discount,
-									) === "string" ? (
-										<>
-											{formatPrice(
-												provider.cachedInputPrice,
-												provider.discount,
-											)}
-											<span className="text-muted-foreground text-xs ml-1">
-												/M
-											</span>
-										</>
-									) : (
-										<span className="inline-flex items-baseline gap-1">
-											{formatPrice(
-												provider.cachedInputPrice,
-												provider.discount,
-											)}
-											<span className="text-muted-foreground text-xs">/M</span>
-										</span>
-									)}
+									<PriceDisplay
+										mapping={displayMapping}
+										field="cachedInputPrice"
+										format={(price) => formatPrice(price, provider.discount)}
+									/>
+									<span className="text-muted-foreground text-xs ml-1">/M</span>
 								</div>
 							</div>
 							<div className="space-y-1">
 								<div className="text-xs text-muted-foreground">Output</div>
 								<div className="font-semibold text-foreground text-sm">
-									{typeof formatPrice(
-										provider.outputPrice,
-										provider.discount,
-									) === "string" ? (
-										<>
-											{formatPrice(provider.outputPrice, provider.discount)}
-											<span className="text-muted-foreground text-xs ml-1">
-												/M
-											</span>
-										</>
-									) : (
-										<span className="inline-flex items-baseline gap-1">
-											{formatPrice(provider.outputPrice, provider.discount)}
-											<span className="text-muted-foreground text-xs">/M</span>
-										</span>
-									)}
+									<PriceDisplay
+										mapping={displayMapping}
+										field="outputPrice"
+										format={(price) => formatPrice(price, provider.discount)}
+									/>
+									<span className="text-muted-foreground text-xs ml-1">/M</span>
 								</div>
 							</div>
 							{provider.requestPrice !== null &&
@@ -253,6 +248,13 @@ export function ProviderModelCard({
 									</div>
 								)}
 						</div>
+						{displayMapping.peakPricing && (
+							<div className="mt-1 text-[10px] text-muted-foreground/70">
+								<PeakHoursCaption
+									hoursUtc={displayMapping.peakPricing.hoursUtc}
+								/>
+							</div>
+						)}
 					</div>
 
 					<div>

@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useMemo, type ReactNode, useRef, useState } from "react";
 
 import { ModelSelector } from "@/components/models/playground-model-selector";
+import { formatPeakHoursUtc } from "@/components/models/price-display";
 import { Badge } from "@/lib/components/badge";
 import { Button } from "@/lib/components/button";
 import {
@@ -30,9 +31,11 @@ import { formatContextSize } from "@/lib/utils";
 import {
 	models,
 	providers as providerDefinitions,
+	resolvePricingDisplay,
 	type ModelDefinition,
 	type ProviderModelMapping,
 	type StabilityLevel,
+	type PricingDisplay,
 } from "@llmgateway/models";
 
 import type { Route } from "next";
@@ -93,6 +96,10 @@ interface PricingSummary {
 	value: string;
 	providerLabel: string;
 	originalValue?: string;
+	/** Peak rate of a peak/off-peak mapping, formatted like `value` (off-peak). */
+	peakValue?: string;
+	/** UTC peak window caption, e.g. "Peak 01:00-04:00 & 06:00-10:00 UTC". */
+	peakHours?: string;
 }
 
 interface ModelDetail {
@@ -246,13 +253,49 @@ function formatPriceValue(value: number, field: PriceField) {
 	return `${formatted}/1M tokens`;
 }
 
+// The per-token price for a field on a mapping, using the off-peak rate as
+// the representative price for peak/off-peak mappings (the cheapest a caller
+// can be billed). Only token fields are time-priced.
+function resolvedFieldPrice(
+	provider: ProviderWithInfo,
+	field: PriceField,
+): string | undefined {
+	if (
+		field === "inputPrice" ||
+		field === "outputPrice" ||
+		field === "cachedInputPrice"
+	) {
+		const display = resolvePricingDisplay(provider);
+		return display.kind === "flat" ? display[field] : display.offPeak[field];
+	}
+	return provider[field] as string | undefined;
+}
+
+// The peak rate for a token field of a peak/off-peak display, if any.
+function peakFieldPrice(
+	display: PricingDisplay,
+	field: PriceField,
+): string | undefined {
+	if (display.kind !== "peak-off-peak") {
+		return undefined;
+	}
+	if (
+		field === "inputPrice" ||
+		field === "outputPrice" ||
+		field === "cachedInputPrice"
+	) {
+		return display.peak[field];
+	}
+	return undefined;
+}
+
 function getPricingSummary(
 	providers: ProviderWithInfo[],
 	field: PriceField,
 ): PricingSummary | undefined {
 	const entries = providers
 		.filter((provider) => {
-			const raw = provider[field];
+			const raw = resolvedFieldPrice(provider, field);
 			if (raw === undefined || raw === null) {
 				return false;
 			}
@@ -260,7 +303,7 @@ function getPricingSummary(
 			return Number.isFinite(num) && num !== 0;
 		})
 		.map((provider) => {
-			const rawValue = Number(provider[field] as string);
+			const rawValue = Number(resolvedFieldPrice(provider, field) as string);
 			const multiplier =
 				field === "requestPrice"
 					? 1000
@@ -277,6 +320,7 @@ function getPricingSummary(
 				discounted,
 				original,
 				hasDiscount: Boolean(discountNum),
+				display: resolvePricingDisplay(provider),
 			};
 		});
 
@@ -293,6 +337,22 @@ function getPricingSummary(
 			: currentBest;
 	});
 
+	const multiplier =
+		field === "requestPrice"
+			? 1000
+			: field === "imageInputPrice"
+				? 1
+				: 1_000_000;
+	const discountNum = Number(best.provider.discount ?? "0");
+	const peakRaw = peakFieldPrice(best.display, field);
+	const peakValue =
+		peakRaw !== undefined
+			? formatPriceValue(
+					Number(peakRaw) * multiplier * (discountNum ? 1 - discountNum : 1),
+					field,
+				)
+			: undefined;
+
 	return {
 		value: formatPriceValue(best.discounted, field),
 		providerLabel:
@@ -300,6 +360,11 @@ function getPricingSummary(
 		originalValue:
 			best.hasDiscount && best.original !== best.discounted
 				? formatPriceValue(best.original, field)
+				: undefined,
+		peakValue,
+		peakHours:
+			best.display.kind === "peak-off-peak"
+				? formatPeakHoursUtc(best.display.hoursUtc)
 				: undefined,
 	};
 }
@@ -472,6 +537,17 @@ function PricingCell({
 					{summary.originalValue}
 				</div>
 			) : null}
+			{summary.peakValue && (
+				<div className="font-medium">
+					{summary.peakValue}{" "}
+					<span className="text-sm text-muted-foreground">peak</span>
+				</div>
+			)}
+			{summary.peakHours && (
+				<div className="text-sm text-muted-foreground/70">
+					{summary.peakHours}
+				</div>
+			)}
 			{hasTieredPricing && (
 				<div className="text-sm text-muted-foreground/70">(tiered pricing)</div>
 			)}
@@ -502,7 +578,7 @@ function getProviderPricingSummary(
 	if (!provider) {
 		return undefined;
 	}
-	const rawRaw = provider[field];
+	const rawRaw = resolvedFieldPrice(provider, field);
 	if (rawRaw === undefined || rawRaw === null) {
 		return undefined;
 	}
@@ -519,12 +595,26 @@ function getProviderPricingSummary(
 	const discountNum = Number(provider.discount ?? "0");
 	const discounted = raw * multiplier * (discountNum ? 1 - discountNum : 1);
 	const original = raw * multiplier;
+	const display = resolvePricingDisplay(provider);
+	const peakRaw = peakFieldPrice(display, field);
+	const peakValue =
+		peakRaw !== undefined
+			? formatPriceValue(
+					Number(peakRaw) * multiplier * (discountNum ? 1 - discountNum : 1),
+					field,
+				)
+			: undefined;
 	return {
 		value: formatPriceValue(discounted, field),
 		providerLabel: provider.providerInfo?.name ?? provider.providerId,
 		originalValue:
 			discountNum && original !== discounted
 				? formatPriceValue(original, field)
+				: undefined,
+		peakValue,
+		peakHours:
+			display.kind === "peak-off-peak"
+				? formatPeakHoursUtc(display.hoursUtc)
 				: undefined,
 	};
 }

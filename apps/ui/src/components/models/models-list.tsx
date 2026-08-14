@@ -2,6 +2,10 @@
 
 import { AlertTriangle } from "lucide-react";
 
+import {
+	PeakHoursCaption,
+	PriceDisplay,
+} from "@/components/models/price-display";
 import { Badge } from "@/lib/components/badge";
 import { Card } from "@/lib/components/card";
 import {
@@ -12,7 +16,7 @@ import {
 } from "@/lib/components/tooltip";
 import { formatContextSize } from "@/lib/utils";
 
-import { models } from "@llmgateway/models";
+import { models, resolvePricingDisplay } from "@llmgateway/models";
 
 import type { ModelDefinition, StabilityLevel } from "@llmgateway/models";
 
@@ -159,45 +163,67 @@ export function ModelsList() {
 							})()}
 						</div>
 						<div className="text-sm">
-							{model.providers.map((provider) => (
-								<div
-									key={`${provider.providerId}-${model.id}-${provider.region ?? ""}`}
-									className="mt-2"
-								>
-									<div className="font-medium">{provider.providerId}:</div>
-									{provider.contextSize && (
-										<div>
-											Context: {formatContextSize(provider.contextSize)}
-										</div>
-									)}
-									{provider.inputPrice !== undefined && (
-										<div>
-											Input: ${Number(provider.inputPrice) * 1e6} / M tokens
-										</div>
-									)}
-									{provider.outputPrice !== undefined && (
-										<div>
-											Output: ${Number(provider.outputPrice) * 1e6} / M tokens
-										</div>
-									)}
-									{provider.imageInputPrice !== undefined && (
-										<div>Image: ${provider.imageInputPrice} / input</div>
-									)}
-									{provider.imageOutputPrice !== undefined && (
-										<div>
-											Image Output: ${Number(provider.imageOutputPrice) * 1e6} /
-											M tokens
-										</div>
-									)}
-									{provider.requestPrice !== undefined &&
-										Number(provider.requestPrice) > 0 && (
+							{model.providers.map((provider) => {
+								const pricingDisplay = resolvePricingDisplay(provider);
+								const formatPrice = (price: string) =>
+									`$${Number(price) * 1e6}`;
+								return (
+									<div
+										key={`${provider.providerId}-${model.id}-${provider.region ?? ""}`}
+										className="mt-2"
+									>
+										<div className="font-medium">{provider.providerId}:</div>
+										{provider.contextSize && (
 											<div>
-												Request: ${Number(provider.requestPrice) * 1000} / 1K
-												requests
+												Context: {formatContextSize(provider.contextSize)}
 											</div>
 										)}
-								</div>
-							))}
+										{provider.inputPrice !== undefined && (
+											<div>
+												Input:{" "}
+												<PriceDisplay
+													mapping={provider}
+													field="inputPrice"
+													format={formatPrice}
+												/>{" "}
+												/ M tokens
+											</div>
+										)}
+										{provider.outputPrice !== undefined && (
+											<div>
+												Output:{" "}
+												<PriceDisplay
+													mapping={provider}
+													field="outputPrice"
+													format={formatPrice}
+												/>{" "}
+												/ M tokens
+											</div>
+										)}
+										{provider.imageInputPrice !== undefined && (
+											<div>Image: ${provider.imageInputPrice} / input</div>
+										)}
+										{provider.imageOutputPrice !== undefined && (
+											<div>
+												Image Output: ${Number(provider.imageOutputPrice) * 1e6}{" "}
+												/ M tokens
+											</div>
+										)}
+										{provider.requestPrice !== undefined &&
+											Number(provider.requestPrice) > 0 && (
+												<div>
+													Request: ${Number(provider.requestPrice) * 1000} / 1K
+													requests
+												</div>
+											)}
+										{pricingDisplay.kind === "peak-off-peak" && (
+											<div className="text-muted-foreground/70 text-[10px]">
+												<PeakHoursCaption hoursUtc={pricingDisplay.hoursUtc} />
+											</div>
+										)}
+									</div>
+								);
+							})}
 						</div>
 					</Card>
 				))}

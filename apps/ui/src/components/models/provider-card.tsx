@@ -12,6 +12,10 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import {
+	PeakHoursCaption,
+	PriceDisplay,
+} from "@/components/models/price-display";
 import { Badge } from "@/lib/components/badge";
 import { Button } from "@/lib/components/button";
 import { Card, CardContent } from "@/lib/components/card";
@@ -23,6 +27,7 @@ import {
 } from "@/lib/components/tooltip";
 import { formatContextSize } from "@/lib/utils";
 
+import { resolvePricingDisplay } from "@llmgateway/models";
 import { getProviderIcon } from "@llmgateway/shared/components";
 
 import type {
@@ -51,6 +56,21 @@ export function ProviderCard({
 	const providerModelName = `${provider.providerId}/${modelName}`;
 	const ProviderIcon = getProviderIcon(provider.providerId);
 	const providerStability = provider.stability ?? modelStability;
+	const pricingDisplay = resolvePricingDisplay(provider);
+
+	const renderPrice = (price: string) =>
+		Number(provider.discount ?? "0") > 0 ? (
+			<>
+				<span className="line-through text-muted-foreground text-xs">
+					${(Number(price) * 1e6).toFixed(2)}
+				</span>
+				<span className="text-green-600 font-semibold">
+					${(Number(price) * 1e6 * (1 - Number(provider.discount))).toFixed(2)}
+				</span>
+			</>
+		) : (
+			`$${(Number(price) * 1e6).toFixed(2)}`
+		);
 
 	const getStabilityBadgeProps = (stability?: StabilityLevel) => {
 		switch (stability) {
@@ -160,23 +180,11 @@ export function ProviderCard({
 							{provider.inputPrice ? (
 								<div className="space-y-1">
 									<div className="flex items-center gap-2">
-										{Number(provider.discount ?? "0") > 0 ? (
-											<>
-												<span className="line-through text-muted-foreground text-xs">
-													${(Number(provider.inputPrice) * 1e6).toFixed(2)}
-												</span>
-												<span className="text-green-600 font-semibold">
-													$
-													{(
-														Number(provider.inputPrice) *
-														1e6 *
-														(1 - Number(provider.discount))
-													).toFixed(2)}
-												</span>
-											</>
-										) : (
-											`$${(Number(provider.inputPrice) * 1e6).toFixed(2)}`
-										)}
+										<PriceDisplay
+											mapping={provider}
+											field="inputPrice"
+											format={renderPrice}
+										/>
 									</div>
 									{Number(provider.discount ?? "0") > 0 && (
 										<Badge
@@ -198,23 +206,11 @@ export function ProviderCard({
 							{provider.outputPrice ? (
 								<div className="space-y-1">
 									<div className="flex items-center gap-2">
-										{Number(provider.discount ?? "0") > 0 ? (
-											<>
-												<span className="line-through text-muted-foreground text-xs">
-													${(Number(provider.outputPrice) * 1e6).toFixed(2)}
-												</span>
-												<span className="text-green-600 font-semibold">
-													$
-													{(
-														Number(provider.outputPrice) *
-														1e6 *
-														(1 - Number(provider.discount))
-													).toFixed(2)}
-												</span>
-											</>
-										) : (
-											`$${(Number(provider.outputPrice) * 1e6).toFixed(2)}`
-										)}
+										<PriceDisplay
+											mapping={provider}
+											field="outputPrice"
+											format={renderPrice}
+										/>
 									</div>
 									{Number(provider.discount ?? "0") > 0 && (
 										<Badge
@@ -231,6 +227,12 @@ export function ProviderCard({
 						</div>
 					</div>
 				</div>
+
+				{pricingDisplay.kind === "peak-off-peak" && (
+					<div className="text-xs text-muted-foreground mb-4">
+						<PeakHoursCaption hoursUtc={pricingDisplay.hoursUtc} />
+					</div>
+				)}
 
 				<div className="border-t pt-4">
 					<div className="text-muted-foreground text-sm mb-2">Capabilities</div>

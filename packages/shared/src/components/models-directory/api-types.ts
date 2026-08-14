@@ -30,6 +30,24 @@ export interface ApiModelProviderMapping {
 	inputPrice: string | null;
 	outputPrice: string | null;
 	cachedInputPrice: string | null;
+	/**
+	 * Peak/off-peak time-of-day pricing for the mapping, serialized from the
+	 * catalogue. Absent (or null) when the mapping bills flat rates.
+	 */
+	peakPricing?: {
+		effectiveAt: string;
+		hoursUtc: [number, number][];
+		peak: {
+			inputPrice: string;
+			outputPrice: string;
+			cachedInputPrice: string | null;
+		};
+		offPeak: {
+			inputPrice: string;
+			outputPrice: string;
+			cachedInputPrice: string | null;
+		};
+	} | null;
 	cacheWriteInputPrice: string | null;
 	cacheWriteInputPrice1h: string | null;
 	imageInputPrice: string | null;

@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { formatContextSize, formatDeprecationDate } from "./format";
 import { ModelCodeExampleDialog } from "./model-code-example-dialog";
 import { ModelStatusBadge } from "./model-status-badge";
+import { PeakAwarePriceCell } from "./peak-aware-price";
 import { XIcon } from "./x-icon";
 
 import type {
@@ -1063,32 +1064,32 @@ export function ProviderSection({
 					<div className="space-y-2">
 						<div className="grid grid-cols-3 gap-px rounded-md bg-border/30 border border-border/30 overflow-hidden">
 							<div className="bg-background p-2">
-								<PriceCell
+								<PeakAwarePriceCell
 									label="Input"
-									price={activeMapping.inputPrice}
-									discount={activeMapping.discount}
+									mapping={activeMapping}
+									field="inputPrice"
 									unit="/M tokens"
-									formatPrice={formatPrice}
+									formatPrice={(p) => formatPrice(p, activeMapping.discount)}
 									multiplier={serviceTierMultiplier}
 								/>
 							</div>
 							<div className="bg-background p-2">
-								<PriceCell
+								<PeakAwarePriceCell
 									label={detailed ? "Cache Read" : "Cached"}
-									price={activeMapping.cachedInputPrice}
-									discount={activeMapping.discount}
+									mapping={activeMapping}
+									field="cachedInputPrice"
 									unit="/M tokens"
-									formatPrice={formatPrice}
+									formatPrice={(p) => formatPrice(p, activeMapping.discount)}
 									multiplier={serviceTierMultiplier}
 								/>
 							</div>
 							<div className="bg-background p-2">
-								<PriceCell
+								<PeakAwarePriceCell
 									label="Output"
-									price={activeMapping.outputPrice}
-									discount={activeMapping.discount}
+									mapping={activeMapping}
+									field="outputPrice"
 									unit="/M tokens"
-									formatPrice={formatPrice}
+									formatPrice={(p) => formatPrice(p, activeMapping.discount)}
 									multiplier={serviceTierMultiplier}
 								/>
 							</div>

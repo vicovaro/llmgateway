@@ -63,6 +63,20 @@ export interface ApiModelProviderMapping {
 	supportsVideoWithoutAudio: boolean | null;
 	perSecondPrice: Record<string, string> | null;
 	perImagePrice: Record<string, string> | null;
+	peakPricing?: {
+		effectiveAt: string;
+		hoursUtc: [number, number][];
+		peak: {
+			inputPrice: string;
+			outputPrice: string;
+			cachedInputPrice: string | null;
+		};
+		offPeak: {
+			inputPrice: string;
+			outputPrice: string;
+			cachedInputPrice: string | null;
+		};
+	} | null;
 	deprecatedAt: string | null;
 	deactivatedAt: string | null;
 	status: "active" | "inactive";

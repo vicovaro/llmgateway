@@ -726,4 +726,42 @@ describe("Models API", () => {
 			}
 		}
 	});
+
+	test("GET /v1/models exposes peak_pricing on peak/off-peak mappings and nowhere else", async () => {
+		const res = await app.request("/v1/models");
+		expect(res.status).toBe(200);
+		const json = await res.json();
+
+		const deepseekV4Flash = json.data.find(
+			(m: { id: string }) => m.id === "deepseek-v4-flash",
+		);
+		expect(deepseekV4Flash).toBeDefined();
+		const deepseekMapping = deepseekV4Flash.providers.find(
+			(p: { providerId: string }) => p.providerId === "deepseek",
+		);
+		expect(deepseekMapping.pricing.peak_pricing).toEqual({
+			effective_at: "2026-08-16T16:00:00Z",
+			hours_utc: [
+				[1, 4],
+				[6, 10],
+			],
+			peak: {
+				prompt: "0.44e-6",
+				completion: "1.32e-6",
+				input_cache_read: "0.014e-6",
+			},
+			off_peak: {
+				prompt: "0.22e-6",
+				completion: "0.66e-6",
+				input_cache_read: "0.007e-6",
+			},
+		});
+		// Reseller mappings keep their flat pricing: no peak_pricing block.
+		const runwareMapping = deepseekV4Flash.providers.find(
+			(p: { providerId: string }) => p.providerId === "runware",
+		);
+		expect(runwareMapping.pricing.peak_pricing).toBeUndefined();
+		// The existing flat price fields are unchanged alongside peak_pricing.
+		expect(deepseekMapping.pricing.prompt).toBe("0.14e-6");
+	});
 });

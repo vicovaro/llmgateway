@@ -4,6 +4,10 @@ import { Copy, Check } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+import {
+	PeakHoursCaption,
+	PriceDisplay,
+} from "@/components/models/price-display";
 import { Button } from "@/lib/components/button";
 import {
 	Card,
@@ -14,6 +18,8 @@ import {
 	CardTitle,
 } from "@/lib/components/card";
 import { formatContextSize } from "@/lib/utils";
+
+import { resolvePricingDisplay } from "@llmgateway/models";
 
 import type { ProviderModelMapping } from "@llmgateway/models";
 
@@ -58,6 +64,12 @@ export function ModelCard({ modelName, providers }: ModelCardProps) {
 
 	const provider = providers[0];
 	const providerModelName = `${provider.providerId}/${modelName}`;
+	const pricingDisplay = resolvePricingDisplay(provider);
+	const formatTokenPrice = (price: string) => (
+		<span className="font-mono text-foreground font-bold">
+			${(Number(price) * 1e6).toFixed(2)}
+		</span>
+	);
 
 	return (
 		<Card className="flex flex-col h-full">
@@ -115,9 +127,11 @@ export function ModelCard({ modelName, providers }: ModelCardProps) {
 							{provider.inputPrice !== undefined &&
 								Number.isFinite(Number(provider.inputPrice)) && (
 									<>
-										<span className="font-mono text-foreground font-bold">
-											${(Number(provider.inputPrice) * 1e6).toFixed(2)}
-										</span>{" "}
+										<PriceDisplay
+											mapping={provider}
+											field="inputPrice"
+											format={formatTokenPrice}
+										/>{" "}
 										<span className="text-muted-foreground">in</span>
 									</>
 								)}
@@ -126,9 +140,11 @@ export function ModelCard({ modelName, providers }: ModelCardProps) {
 								Number.isFinite(Number(provider.outputPrice)) && (
 									<>
 										<span className="text-muted-foreground mx-2">/</span>
-										<span className="font-mono text-foreground font-bold">
-											${(Number(provider.outputPrice) * 1e6).toFixed(2)}
-										</span>{" "}
+										<PriceDisplay
+											mapping={provider}
+											field="outputPrice"
+											format={formatTokenPrice}
+										/>{" "}
 										<span className="text-muted-foreground">out</span>
 									</>
 								)}
@@ -137,6 +153,11 @@ export function ModelCard({ modelName, providers }: ModelCardProps) {
 								Number(provider.requestPrice) !== 0 &&
 								` / $${(Number(provider.requestPrice) * 1000).toFixed(2)} per 1K req`}
 						</p>
+						{pricingDisplay.kind === "peak-off-peak" && (
+							<p className="text-muted-foreground/70 text-[10px] mt-0.5">
+								<PeakHoursCaption hoursUtc={pricingDisplay.hoursUtc} />
+							</p>
+						)}
 						{(provider.pricingTiers?.length ?? 0) > 1 && (
 							<p className="text-muted-foreground/70 text-[10px] mt-0.5">
 								Tiered pricing available

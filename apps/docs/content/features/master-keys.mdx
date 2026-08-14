@@ -952,3 +952,46 @@ Response (200):
 ```json
 { "message": "Custom model deleted successfully" }
 ```
+
+## Model catalogue pricing
+
+The gateway's [model catalogue API](/v1_models) reports each provider mapping's per-token rates in its `pricing` object (`prompt`, `completion`, `input_cache_read`). Mappings billed with peak/off-peak time-of-day pricing carry an extra `peak_pricing` object:
+
+- `effective_at` — ISO-8601 instant when peak/off-peak pricing takes effect. Before it, the base `pricing.prompt` / `pricing.completion` / `pricing.input_cache_read` fields (the regular flat rates) apply.
+- `peak` / `off_peak` — per-token rates billed during peak hours and outside them, using the same `prompt` / `completion` / `input_cache_read` keys as the base pricing.
+- `hours_utc` — array of half-open `[start, end)` UTC hour ranges during which the `peak` rates apply. A request at UTC hour `h` bills peak when `start <= h < end` for any range; all other hours bill off-peak.
+
+```json
+{
+	"id": "deepseek-v4-flash",
+	"providers": [
+		{
+			"providerId": "deepseek",
+			"pricing": {
+				"prompt": "0.14e-6",
+				"completion": "0.28e-6",
+				"input_cache_read": "0.0028e-6",
+				"peak_pricing": {
+					"effective_at": "2026-08-16T16:00:00Z",
+					"hours_utc": [
+						[1, 4],
+						[6, 10]
+					],
+					"peak": {
+						"prompt": "0.44e-6",
+						"completion": "1.32e-6",
+						"input_cache_read": "0.014e-6"
+					},
+					"off_peak": {
+						"prompt": "0.22e-6",
+						"completion": "0.66e-6",
+						"input_cache_read": "0.007e-6"
+					}
+				}
+			}
+		}
+	]
+}
+```
+
+Peak/off-peak rates are resolved per request at billing time, so the catalogue always reports all three rate sets — a client can compute the cost of any request without re-fetching.

@@ -55,6 +55,25 @@ export function adaptProviderMapping(
 			inputPrice: toStr(p.inputPrice),
 			outputPrice: toStr(p.outputPrice),
 			cachedInputPrice: toStr(p.cachedInputPrice),
+			peakPricing: p.peakPricing
+				? {
+						effectiveAt: p.peakPricing.effectiveAt,
+						hoursUtc: p.peakPricing.hoursUtc.map(([start, end]) => [
+							start,
+							end,
+						]),
+						peak: {
+							inputPrice: p.peakPricing.peak.inputPrice,
+							outputPrice: p.peakPricing.peak.outputPrice,
+							cachedInputPrice: toStr(p.peakPricing.peak.cachedInputPrice),
+						},
+						offPeak: {
+							inputPrice: p.peakPricing.offPeak.inputPrice,
+							outputPrice: p.peakPricing.offPeak.outputPrice,
+							cachedInputPrice: toStr(p.peakPricing.offPeak.cachedInputPrice),
+						},
+					}
+				: null,
 			cacheWriteInputPrice: toStr(p.cacheWriteInputPrice),
 			cacheWriteInputPrice1h: toStr(p.cacheWriteInputPrice1h),
 			imageInputPrice: toStr(p.imageInputPrice),
